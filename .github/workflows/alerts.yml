@@ -1,0 +1,31 @@
+name: NEXUS Telegram Alerts
+
+# Runs the NEXUS engine in the cloud on a schedule and pushes Telegram
+# alerts on fresh signals - so you get pinged even when the dashboard is
+# closed. Add TELEGRAM_TOKEN and TELEGRAM_CHAT_ID as repository secrets.
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # every 5 minutes (GitHub may delay under load)
+  workflow_dispatch:          # lets you run it manually from the Actions tab
+
+# Avoid overlapping runs if one scan is slow.
+concurrency:
+  group: nexus-alerts
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run NEXUS scan
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          CONF_THRESH: '0.72'
+        run: node scripts/scan.js

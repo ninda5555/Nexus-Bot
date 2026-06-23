@@ -532,7 +532,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   </div>
   <div class="setting-row">
     <div class="setting-label">PROBABILITY THRESHOLD (%)</div>
-    <input class="setting-input" id="setConf" type="number" value="68" min="55" max="90" placeholder="68">
+    <input class="setting-input" id="setConf" type="number" value="72" min="55" max="90" placeholder="72">
   </div>
   <div class="setting-row">
     <div class="setting-label">SOUND ALERTS</div>
@@ -599,7 +599,7 @@ const COINS = [
 const dpOf = (short)=> (COINS.find(c=>c.short===short)||{dp:2}).dp;
 
 // -- SETTINGS (persistent) -----------------------------------------
-const DEFAULTS = { capital:100000, riskPct:0.0025, confThresh:0.68, sound:true, vib:true, paper:true, auto:true };
+const DEFAULTS = { capital:100000, riskPct:0.0025, confThresh:0.72, sound:true, vib:true, paper:true, auto:true };
 let S = loadSettings();
 let curSym='BTCUSDT', curShort='BTC';
 let timerLeft=300, timerInt=null;
@@ -762,7 +762,8 @@ function backtest(can){
   for(let i=start;i<=end;i++){
     const slice=can.slice(0,i+1);
     const f=buildFeatures(slice);
-    if(f.adx<18)continue;                 // regime gate (same as live)
+    if(f.adx<22)continue;                 // regime gate (tuned: clear trends only)
+    if(f.rvol<1.0)continue;               // confirmation: real participation
     const s=scoreFeatures(f);
     if(pConfOf(s)<thr)continue;            // probability gate (same as live)
     const isLong=s.dir==='LONG';
@@ -851,7 +852,7 @@ async function runPipeline(sym){
   // STEP 3: REGIME
   step(3,'run');await d(140);
   if(f.rvol<0.55&&f.adx<16){R.regime='LOW_LIQUIDITY';step(3,'fail');R.decision='NO_ACTION';return R;}
-  if(f.adx<18){R.regime='RANGING';step(3,'fail');R.decision='NO_ACTION';return R;}
+  if(f.adx<22){R.regime='RANGING';step(3,'fail');R.decision='NO_ACTION';return R;}
   if(f.vp>90&&f.adx<32){R.regime='CHOP';step(3,'fail');R.decision='NO_ACTION';return R;}
   R.regime=isLong?'TRENDING_UP':'TRENDING_DOWN';
   step(3,'pass');
@@ -860,7 +861,7 @@ async function runPipeline(sym){
   step(4,'run');await d(140);
   const closes=ltf.map(c=>c.c);
   const ff=[];
-  if(f.rvol<0.55)ff.push('RVOL_LOW');
+  if(f.rvol<1.0)ff.push('RVOL_BELOW_AVG');
   if(f.vp<10)ff.push('VOL_DEAD');
   if(f.bbw>f.bbwP*2.6)ff.push('BB_EXPLOSION');
   if(f.eff<0.12)ff.push('LOW_EFFICIENCY');
@@ -871,8 +872,9 @@ async function runPipeline(sym){
     if(bar.l<rl&&bar.c>rl&&bar.v<avgV*1.2)ff.push('FAKE_BREAK_DN');
   }
   if(ff.length>0){step(4,'fail');R.decision='NO_ACTION';R.critique.filters=ff;return R;}
-  // MTF alignment: need 2 of 3 aligned with direction
+  // MTF alignment: 1H must confirm, AND >=2 of 3 timeframes aligned (tuned)
   const want=isLong?'buy':'sell';
+  if(R.mtf.m1.dir!==want){step(4,'fail');R.decision='NO_ACTION';R.critique.mtf='1H_NOT_CONFIRMING';return R;}
   const align=[R.mtf.m5.dir,R.mtf.m1.dir,R.mtf.m4.dir].filter(x=>x===want).length;
   if(align<2){step(4,'fail');R.decision='NO_ACTION';R.critique.mtf=`MTF_ALIGN_${align}/3`;return R;}
   step(4,'pass');

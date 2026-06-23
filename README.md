@@ -56,6 +56,43 @@ It's a single file. Either:
 Capital, risk-per-trade %, probability threshold, sound/vibration alerts, auto
 paper trading, and auto-refresh — all persisted locally.
 
+## 📲 Telegram alerts (works even when the dashboard is closed)
+
+The dashboard only runs while open in a browser. To get pinged 24/7, a
+**GitHub Actions** job (`.github/workflows/alerts.yml`) runs the same engine
+every ~5 minutes in the cloud and sends a Telegram message on **fresh** signals
+(it won't repeat-spam the same signal). This must live on the **default branch
+(`main`)** — GitHub only runs scheduled workflows from the default branch.
+
+**One-time setup:**
+1. In Telegram, message **@BotFather** → `/newbot` → copy the **bot token**.
+2. Message **@userinfobot** (or @RawDataBot) → copy your numeric **chat id**.
+3. Send your new bot any message once (so it can DM you).
+4. In GitHub: **repo → Settings → Secrets and variables → Actions → New
+   repository secret**, add two secrets:
+   - `TELEGRAM_TOKEN` = the BotFather token
+   - `TELEGRAM_CHAT_ID` = your chat id
+5. **Actions** tab → **NEXUS Telegram Alerts** → **Run workflow** to test now.
+   After that it runs automatically every ~5 min.
+
+Secrets are stored encrypted by GitHub and never appear in code. (The old
+`live_oracle.py` hardcoded a token — don't do that; rotate it via @BotFather.)
+
+> Note: Binance geo-blocks some cloud IPs. The scanner falls back across
+> several public kline hosts to stay reliable on GitHub's runners.
+
+## Accuracy tuning
+
+The engine is tuned for **fewer, stronger** signals (higher precision):
+- Probability threshold **72%** (was 68%) — configurable in Settings.
+- ADX floor **22** — only clear trends, no chop.
+- **RVOL ≥ 1.0** — requires above-average volume (real participation).
+- **1H timeframe must confirm** + at least 2 of 3 timeframes aligned.
+- Backtest applies the same gates, so the displayed hit-rate stays honest.
+
+Raise the threshold further (e.g. 78%) for an even higher win-rate at the cost
+of fewer trades. Let paper trading validate any change first.
+
 ## Notes
 
 - `live_oracle.py` is a separate, older bot kept for reference. **It contains a
